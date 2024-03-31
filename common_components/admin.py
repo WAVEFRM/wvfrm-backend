@@ -1,8 +1,4 @@
 from django.contrib import admin
-
-
-from .models import UserProfile,SongPopResults
+from common_components.models import UserProfile
 
 admin.site.register(UserProfile)
-admin.site.register(SongPopResults)
-# Register your models here.

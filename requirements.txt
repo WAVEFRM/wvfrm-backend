@@ -44,3 +44,4 @@ peakutils
 python-dotenv==1.0.0
 # matplotlib==3.8.2
 django-allauth==0.60.1
+django-cors-headers==4.3.1

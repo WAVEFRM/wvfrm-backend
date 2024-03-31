@@ -27,6 +27,7 @@ DEBUG = True
 
 ALLOWED_HOSTS = ['*']
 CORS_ORIGIN_ALLOW_ALL = True
+CORS_ALLOW_ALL_ORIGINS = True  # Allow requests from any origin
 
 
 # Application definition
@@ -44,6 +45,7 @@ INSTALLED_APPS = [
     'social_django',
     'rest_framework_social_oauth2',
     'drf_yasg',
+    'corsheaders',  # Added django-cors-headers
 ]
 
 MIDDLEWARE = [
@@ -55,6 +57,7 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'corsheaders.middleware.CorsMiddleware',  # Added django-cors-headers middleware
 ]
 
 ROOT_URLCONF = 'wvfrm_backend.urls'
