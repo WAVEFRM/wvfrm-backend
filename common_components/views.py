@@ -76,4 +76,19 @@ class UserProfileView(APIView):
         serializer = UserProfileSerializer(user_profile)
 
         return Response(serializer.data, status=status.HTTP_200_OK)
+    
+    
+class UserProfileEditView(APIView):
+    permission_classes = [IsAuthenticated]
 
+    def put(self, request):
+        try:
+            user_profile = request.user.userprofile
+        except UserProfile.DoesNotExist:
+            return Response({'error': 'UserProfile does not exist for this user.'}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = UserProfileSerializer(user_profile, data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
