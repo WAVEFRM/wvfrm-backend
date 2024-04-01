@@ -38,6 +38,7 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     path("auth/", include("rest_framework_social_oauth2.urls")),
     path("profile/",include("common_components.urls")),
+    path("predict/",include("predict.urls")),
     # path("profiles/", include("common_components.urls")),  # Assuming you have a separate urls.py in common_components app
     re_path(r'^swagger(?P<format>\.json|\.yaml)$', schema_view.without_ui(cache_timeout=0), name='schema-json'),
    path('swagger/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
