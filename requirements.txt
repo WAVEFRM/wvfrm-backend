@@ -47,3 +47,5 @@ django-allauth==0.60.1
 django-cors-headers==4.3.1
 cloudinary==1.39.1
 librosa==0.10.1
+scikit-learn==1.2.2
+joblib==1.2.0

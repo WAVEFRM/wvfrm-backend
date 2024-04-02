@@ -12,6 +12,7 @@ from common_components.utils import upload_song_file_cloudinary
 import threading
 import librosa
 import numpy as np
+import joblib
 
 
 class CustomPagination(PageNumberPagination):
@@ -55,6 +56,7 @@ class PopularityPredictionTaskListView(APIView):
         
 class LowLevelPredictionView(APIView):
     permission_classes = [IsAuthenticated]
+
     def post(self, request):
         # Get the user associated with the bearer token
         user = request.user
@@ -116,6 +118,52 @@ class LowLevelPredictionView(APIView):
                 task_instance.status = 'failed'
                 task_instance.save()
             print("Error in async_analysis_helper:", e)
+            
+
+class HighLevelPredictionView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        # Get the user associated with the bearer token
+        user = request.user
+
+        # Check if a user profile exists
+        if not hasattr(user, 'userprofile'):
+            return Response({'error': 'UserProfile does not exist for this user.'}, status=status.HTTP_404_NOT_FOUND)
+
+        # Retrieve the user profile
+        user_profile = user.userprofile
+
+        # Load the model
+        try:
+            model = joblib.load('predict/models/model.pkl')
+            print(model)
+        except FileNotFoundError:
+            return Response({"error": "Model file not found"}, status=status.HTTP_404_NOT_FOUND)
+        
+        # Extract data from the request
+        data = request.data
+        print(data)
+        keys = ['acousticness', 'danceability', 'duration_ms', 'energy', 'explicit', 'instrumentalness', 
+                'liveness', 'loudness', 'speechiness', 'tempo', 'valence', 'year',
+                'key_1', 'key_2', 'key_3', 'key_4', 'key_5', 'key_6', 'key_7', 'key_8', 'key_9', 'key_10', 'key_11', 
+                'mode', 'acousticness_ar', 'danceability_ar', 'duration_ms_ar', 'energy_ar', 
+                'instrumentalness_ar', 'liveness_ar', 'loudness_ar', 'speechiness_ar', 'tempo_ar', 'valence_ar', 
+                'popularity_ar']
+        
+        # Validate if all required keys are present in the request
+        for key in keys:
+            if key not in data:
+                return Response({"error": f"Key '{key}' not found in request data"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Make prediction
+        try:
+            prediction = model.predict([[data[key] for key in keys]])
+            output = prediction[0]
+            return Response({"output": output}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"error": f"Prediction failed: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
 
 
 
