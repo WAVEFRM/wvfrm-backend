@@ -4,8 +4,19 @@ from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 
 from common_components.models import UserProfile
-from common_components.serializers import UserProfileSerializer
+from common_components.serializers import UserProfileSerializer, UserProfileViewSerializer
 
+from common_components.utils import upload_profile_pic_cloudinary, upload_song_file_cloudinary
+
+from dotenv import load_dotenv
+import os 
+load_dotenv()
+
+CLOUDINARY_CLOUD_NAME = os.getenv('CLOUDINARY_CLOUD_NAME')
+CLOUDINARY_API_KEY = os.getenv('CLOUDINARY_API_KEY')
+CLOUDINARY_API_SECRET = os.getenv('CLOUDINARY_API_SECRET')
+
+PROFILE_PIC_DEFAULT = os.getenv('PROFILE_PIC_DEFAULT')
 
 class CheckProfileView(APIView):
     permission_classes = [IsAuthenticated]
@@ -17,7 +28,7 @@ class CheckProfileView(APIView):
         try:
             user_profile = request.user.userprofile
             user_profile_exists = True
-            serializer = UserProfileSerializer(user_profile)
+            serializer = UserProfileViewSerializer(user_profile)
             profile_data = serializer.data
         except UserProfile.DoesNotExist:
             pass
@@ -38,7 +49,12 @@ class UserProfileCreateView(APIView):
         # Check if a user profile already exists
         if hasattr(user, 'userprofile'):
             return Response({'error': 'UserProfile already exists for this user.'}, status=status.HTTP_409_CONFLICT)
-
+        
+        profile_pic_url = None
+        if 'profile_pic' in request.FILES:
+            profile_pic = request.FILES['profile_pic']
+            profile_pic_url = upload_profile_pic_cloudinary(profile_pic)
+            
         # Extract additional fields from the request if needed
         gender = request.data.get('gender')
         dob = request.data.get('dob')
@@ -48,6 +64,7 @@ class UserProfileCreateView(APIView):
             'user': user.id,
             'gender': gender,
             'dob': dob,
+            'profile_pic_url': profile_pic_url if profile_pic_url else PROFILE_PIC_DEFAULT,
         }
 
         serializer = UserProfileSerializer(data=user_profile_data)
@@ -73,7 +90,7 @@ class UserProfileView(APIView):
         user_profile = user.userprofile
 
         # Serialize the user profile data
-        serializer = UserProfileSerializer(user_profile)
+        serializer = UserProfileViewSerializer(user_profile)
 
         return Response(serializer.data, status=status.HTTP_200_OK)
     
@@ -87,8 +104,32 @@ class UserProfileEditView(APIView):
         except UserProfile.DoesNotExist:
             return Response({'error': 'UserProfile does not exist for this user.'}, status=status.HTTP_404_NOT_FOUND)
 
-        serializer = UserProfileSerializer(user_profile, data=request.data)
+        # Check if a profile picture is included in the request
+        profile_pic_url = user_profile.profile_pic_url
+        if 'profile_pic' in request.FILES:
+            profile_pic = request.FILES['profile_pic']
+            profile_pic_url = upload_profile_pic_cloudinary(profile_pic)
+
+        # Update the profile data including the profile picture URL
+        request.data['profile_pic_url'] = profile_pic_url
+
+        serializer = UserProfileSerializer(user_profile, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class UserDeleteView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request):
+        try:
+            # Retrieve the authenticated user
+            user = request.user
+            # Delete the user
+            user.delete()
+            return Response({'message': 'User deleted successfully'}, status=status.HTTP_204_NO_CONTENT)
+        except Exception as e:
+            # If any exception occurs during the deletion process
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
