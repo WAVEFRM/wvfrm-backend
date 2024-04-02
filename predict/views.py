@@ -10,8 +10,17 @@ class UploadMP3File(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
+
+        
+        if 'song_file' not in request.FILES:
+            return Response({"error": "No file uploaded"}, status=status.HTTP_400_BAD_REQUEST)
+
         song_file = request.FILES['song_file']
-        print(song_file)
+
+        # Check the file name
+        if not song_file.name.endswith('.mp3'):
+            return Response({"error": "Invalid file format. Please upload an MP3 file"}, status=status.HTTP_400_BAD_REQUEST)
+
 
         if song_file:
             # Save the uploaded file
@@ -42,23 +51,23 @@ class UploadMP3File(APIView):
             print('chroma_stft', chroma_stft)
             valence = np.mean(librosa.feature.chroma_cens(y=y, sr=sr))
             print('valence', valence)
-            y_harmonic, y_percussive = librosa.effects.hpss(y)
-            print('y_harmonic', y_harmonic)
-            centroid_harmonic = np.mean(librosa.feature.spectral_centroid(y=y_harmonic, sr=sr))
-            print('centroid_harmonic', centroid_harmonic)
-            centroid_percussive = np.mean(librosa.feature.spectral_centroid(y=y_percussive, sr=sr))
-            print('centroid_percussive', centroid_percussive)
-            instrumentalness = centroid_harmonic / centroid_percussive if centroid_percussive != 0 else 0
-            print('instrumentalness', instrumentalness)
+            # y_harmonic, y_percussive = librosa.effects.hpss(y)
+            # print('y_harmonic', y_harmonic)
+            # centroid_harmonic = np.mean(librosa.feature.spectral_centroid(y=y_harmonic, sr=sr))
+            # print('centroid_harmonic', centroid_harmonic)
+            # centroid_percussive = np.mean(librosa.feature.spectral_centroid(y=y_percussive, sr=sr))
+            # print('centroid_percussive', centroid_percussive)
+            # instrumentalness = centroid_harmonic / centroid_percussive if centroid_percussive != 0 else 0
+            # print('instrumentalness', instrumentalness)
             acousticness = np.mean(librosa.feature.spectral_centroid(y=y, sr=sr))
             print('acousticness', acousticness)
             speechiness = np.mean(librosa.feature.spectral_contrast(y=y, sr=sr))
             print('speechiness', speechiness)
 
             # Compute repetition score
-            onset_times = librosa.frames_to_time(librosa.onset.onset_detect(onset_envelope=onset_env, sr=sr), sr=sr)
-            iois = np.diff(onset_times)
-            repetition_score = len(iois) / np.sum(iois)
+            # onset_times = librosa.frames_to_time(librosa.onset.onset_detect(onset_envelope=onset_env, sr=sr), sr=sr)
+            # iois = np.diff(onset_times)
+            # repetition_score = len(iois) / np.sum(iois)
 
             # You can print or process these features further as needed
             print("Duration:", duration)
@@ -68,10 +77,10 @@ class UploadMP3File(APIView):
             print("Loudness:", loudness)
             print("Chroma STFT:", chroma_stft)
             print("Valence:", valence)
-            print("Instrumentalness:", instrumentalness)
+            # print("Instrumentalness:", instrumentalness)
             print("Acousticness:", acousticness)
             print("Speechiness:", speechiness)
-            print("Repetition Score:", repetition_score)
+            # print("Repetition Score:", repetition_score)
 
             return Response({"message": "MP3 file uploaded successfully"}, status=status.HTTP_201_CREATED)
         else:
