@@ -107,8 +107,14 @@ class LowLevelPredictionView(APIView):
                 task_instance.save()
                 print('Task updated successfully')
 
+            task_instance.status = 'completed'
+            task_instance.save()
+
             print('Ending Analysis')
         except Exception as e:
+            if task_instance is not None:
+                task_instance.status = 'failed'
+                task_instance.save()
             print("Error in async_analysis_helper:", e)
 
 
