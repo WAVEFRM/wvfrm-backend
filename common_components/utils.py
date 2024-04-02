@@ -20,13 +20,14 @@ def upload_profile_pic_cloudinary(image_file):
                             folder = 'profile_pics',
                             allowed_formats = ['jpg', 'jpeg', 'png', 'gif', 'svg'],
                             unique_filename = False,
-                            overwrite=True)
+                            overwrite = True)
     return response.get('secure_url', None)
 
 def upload_song_file_cloudinary(video_file):
     response = cloudinary.uploader.upload(video_file,
                             folder = 'song_files',
-                            allowed_formats = ['mp3', 'mp4'],
+                            allowed_formats = ['mp3'],
+                            resource_type = 'video',
                             unique_filename = False,
-                            overwrite=True)
+                            overwrite = True)
     return response.get('secure_url', None)
