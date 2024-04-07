@@ -158,7 +158,7 @@ class HighLevelPredictionView(APIView):
         
         # Make prediction
         try:
-            prediction = model.predict([[data[key] for key in keys]])
+            prediction = model.predict([[float(data[key]) for key in keys]])
             output = prediction[0]
             return Response({"output": output}, status=status.HTTP_200_OK)
         except Exception as e:
