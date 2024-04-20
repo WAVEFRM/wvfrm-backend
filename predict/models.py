@@ -1,4 +1,5 @@
 from django.db import models
+
 try:
     from django.db.models import JSONField
 except ImportError:
@@ -6,18 +7,21 @@ except ImportError:
 from django.utils import timezone
 from common_components.models import UserProfile
 
+
 class PopularityPredictionTask(models.Model):
     STATUS_CHOICES = [
-        ('pending', 'Pending'),
-        ('completed', 'Completed'),
-        ('failed', 'Failed'),
+        ("pending", "Pending"),
+        ("completed", "Completed"),
+        ("failed", "Failed"),
     ]
 
     user_profile = models.ForeignKey(UserProfile, on_delete=models.CASCADE)
+    song_name = models.CharField(max_length=255, null=True, blank=True)
     song_file_url = models.CharField(max_length=255, null=True, blank=True)
+    song_cover_art_url = models.CharField(max_length=255, null=True, blank=True)
     result = JSONField(default=dict)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending")
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        ordering = ['-created_at']
+        ordering = ["-created_at"]
