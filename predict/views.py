@@ -8,6 +8,9 @@ from rest_framework.permissions import AllowAny
 from predict.models import PopularityPredictionTask
 from predict.serializers import PopularityPredictionTaskSerializer
 from common_components.utils import upload_profile_pic_cloudinary, upload_song_file_cloudinary
+from django.core.files.base import ContentFile
+
+from io import BytesIO
 
 import threading
 import librosa
@@ -43,9 +46,32 @@ class CustomPagination(PageNumberPagination):
         )
 
 
+# class PopularityPredictionTaskListView(APIView):
+#     permission_classes = [IsAuthenticated]
+#     pagination_class = CustomPagination
+
+#     def get(self, request):
+#         try:
+#             # Get the user profile associated with the authenticated user
+#             user_profile = request.user.userprofile
+#         except AttributeError:
+#             return Response({"error": "UserProfile does not exist for this user."}, status=status.HTTP_404_NOT_FOUND)
+
+#         # Retrieve all PopularityPredictionTask instances related to the user profile
+#         tasks = PopularityPredictionTask.objects.filter(user_profile=user_profile)
+
+#         # Paginate the queryset
+#         paginator = CustomPagination()
+#         result_page = paginator.paginate_queryset(tasks, request)
+
+#         # Serialize the paginated queryset
+#         serializer = PopularityPredictionTaskSerializer(result_page, many=True)
+
+#         return paginator.get_paginated_response(serializer.data)
+
+
 class PopularityPredictionTaskListView(APIView):
     permission_classes = [IsAuthenticated]
-    pagination_class = CustomPagination
 
     def get(self, request):
         try:
@@ -57,14 +83,10 @@ class PopularityPredictionTaskListView(APIView):
         # Retrieve all PopularityPredictionTask instances related to the user profile
         tasks = PopularityPredictionTask.objects.filter(user_profile=user_profile)
 
-        # Paginate the queryset
-        paginator = CustomPagination()
-        result_page = paginator.paginate_queryset(tasks, request)
+        # Serialize the queryset
+        serializer = PopularityPredictionTaskSerializer(tasks, many=True)
 
-        # Serialize the paginated queryset
-        serializer = PopularityPredictionTaskSerializer(result_page, many=True)
-
-        return paginator.get_paginated_response(serializer.data)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class LowLevelPredictionView(APIView):
@@ -83,6 +105,8 @@ class LowLevelPredictionView(APIView):
 
         song_name = request.data.get("song_name")
 
+        explicit = int(request.data.get("explicit", 0))
+
         # Check if the file exists in the request
         if "song_file" not in request.FILES:
             return Response({"error": "No file was uploaded"}, status=status.HTTP_400_BAD_REQUEST)
@@ -93,6 +117,22 @@ class LowLevelPredictionView(APIView):
             return Response(
                 {"error": "Invalid file format. Please upload an mp3 file"}, status=status.HTTP_400_BAD_REQUEST
             )
+        print(song_file)
+
+        # song_file_copy = ContentFile(song_file.read())
+        # song_file_copy.name = song_file.name
+
+        try:
+
+            y, sr = librosa.load(song_file, sr=None)  # Load audio file and specify sample rate
+        except:
+            return Response({"error": "Format not recognised"}, status=status.HTTP_400_BAD_REQUEST)
+
+        print("checkpoint")
+
+        # Extract duration
+        # duration = librosa.get_duration(y=y, sr=sr)
+        # print(duration)
 
         song_art_cover_url = PROFILE_PIC_DEFAULT
         if "song_art_cover" in request.FILES:
@@ -101,7 +141,18 @@ class LowLevelPredictionView(APIView):
 
         print(song_art_cover_url)
 
+        # song_file = request.FILES["song_file1"]
+        # if not song_file.name.lower().endswith(".mp3"):
+        #     return Response(
+        #         {"error": "Invalid file format. Please upload an mp3 file"}, status=status.HTTP_400_BAD_REQUEST
+        #     )
+        # print(song_file)
+
+        song_file.seek(0)
+
         song_file_content = song_file.read()
+
+        # print(song_file_content)
 
         try:
             # Create the task with status pending
@@ -116,7 +167,9 @@ class LowLevelPredictionView(APIView):
 
             # Start the analysis task thread
             analysis_thread = threading.Thread(
-                target=self.run_analysis_thread, args=(user_profile, task_instance, song_file_content), daemon=True
+                target=self.run_analysis_thread,
+                args=(user_profile, task_instance, song_file_content, song_file, y, sr, explicit),
+                daemon=True,
             )
             analysis_thread.start()
 
@@ -124,11 +177,20 @@ class LowLevelPredictionView(APIView):
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-    def run_analysis_thread(self, user_profile, task_instance, song_file_content):
+    def run_analysis_thread(self, user_profile, task_instance, song_file_content, song_file, y, sr, explicit):
         try:
             print("Starting Analysis")
 
+            try:
+                model = joblib.load("predict/models/adaboost_model_low_level.pkl")
+                print(model)
+            except FileNotFoundError:
+                return Response({"error": "Model file not found"}, status=status.HTTP_404_NOT_FOUND)
+
             print("Uploading song file to Cloudinary")
+
+            # print(song_file_content)
+
             response = upload_song_file_cloudinary(song_file_content)
             print("Song URL : ", response)
             if response is not None:
@@ -136,7 +198,117 @@ class LowLevelPredictionView(APIView):
                 task_instance.save()
                 print("Task updated successfully")
 
+            # print(song_file)
+            # y, sr = librosa.load(song_file, sr=None)
+            # duration = librosa.get_duration(y=y, sr=sr)
+            # print(duration)
+
+            duration = librosa.get_duration(y=y, sr=sr)
+            print(duration)
+
+            # Extract other features
+            tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
+            print("tempo", tempo)
+            energy = np.mean(librosa.feature.rms(y=y))
+            print("energy", energy)
+            onset_env = librosa.onset.onset_strength(y=y, sr=sr)
+            print("onset_env", onset_env)
+            danceability = np.mean(onset_env)
+            print("danceability", danceability)
+            loudness = np.mean(librosa.amplitude_to_db(np.abs(librosa.stft(y)), ref=np.max))
+            print("loudness", loudness)
+            chroma_stft = np.mean(librosa.feature.chroma_stft(y=y, sr=sr))
+            print("chroma_stft", chroma_stft)
+            valence = np.mean(librosa.feature.chroma_cens(y=y, sr=sr))
+            print("valence", valence)
+            y_harmonic, y_percussive = librosa.effects.hpss(y)
+            print("y_harmonic", y_harmonic)
+            centroid_harmonic = np.mean(librosa.feature.spectral_centroid(y=y_harmonic, sr=sr))
+            print("centroid_harmonic", centroid_harmonic)
+            centroid_percussive = np.mean(librosa.feature.spectral_centroid(y=y_percussive, sr=sr))
+            print("centroid_percussive", centroid_percussive)
+            instrumentalness = centroid_harmonic / centroid_percussive if centroid_percussive != 0 else 0
+            print("instrumentalness", instrumentalness)
+            acousticness = np.mean(librosa.feature.spectral_centroid(y=y, sr=sr))
+            print("acousticness", acousticness)
+            speechiness = np.mean(librosa.feature.spectral_contrast(y=y, sr=sr))
+            print("speechiness", speechiness)
+
+            # Compute repetition score
+            # onset_times = librosa.frames_to_time(librosa.onset.onset_detect(onset_envelope=onset_env, sr=sr), sr=sr)
+            # iois = np.diff(onset_times)
+            # repetition_score = len(iois) / np.sum(iois)
+
+            # You can print or process these features further as needed
+            print("Duration:", duration)
+            print("Tempo:", tempo)
+            print("Energy:", energy)
+            print("Danceability:", danceability)
+            print("Loudness:", loudness)
+            print("Chroma STFT:", chroma_stft)
+            print("Valence:", valence)
+            print("Instrumentalness:", instrumentalness)
+            print("Acousticness:", acousticness)
+            print("Speechiness:", speechiness)
+
+            album_release_date = 2024.0  ## as of now the model assumes the release_date as today , it is used in the trained model (good enough co-relation)
+
+            X_new = [
+                [
+                    tempo,
+                    energy,
+                    danceability,
+                    loudness,
+                    chroma_stft,
+                    valence,
+                    instrumentalness,
+                    acousticness,
+                    speechiness,
+                    album_release_date,
+                    explicit,
+                ]
+                # Replace tempo, energy, ... with your actual feature values
+            ]
+
+            predictions = model.predict(X_new)
+            print("predictions")
+            print(predictions[0])
+            predicted_popularity = predictions[0]
+
+            print("Problems")
+
+            print(valence)
+            print(type(tempo))
+            print(type(energy))
+            print(type(danceability))
+            print(type(loudness))
+            print(type(chroma_stft))
+            print(type(valence))
+            print(energy)
+
+            print("problems")
+
+            energy_float64 = np.float64(energy)
+            danceability_float64 = np.float64(danceability)
+            loudness_float64 = np.float64(loudness)
+            chroma_stft_float64 = np.float64(chroma_stft)
+            valence_float64 = np.float64(valence)
+
             task_instance.status = "completed"
+            task_instance.result = {
+                "duration": duration,
+                "tempo": tempo,
+                "energy": energy_float64,
+                "danceability": danceability_float64,
+                "loudness": loudness_float64,
+                "chroma_stft": chroma_stft_float64,
+                "valence": valence_float64,
+                "instrumentalness": instrumentalness,
+                "acousticness": acousticness,
+                "speechiness": speechiness,
+                "explicit": explicit,
+                "predicted_popularity": predicted_popularity,
+            }
             task_instance.save()
 
             print("Ending Analysis")
