@@ -127,12 +127,6 @@ class LowLevelPredictionView(APIView):
         # song_file_copy = ContentFile(song_file.read())
         # song_file_copy.name = song_file.name
 
-        try:
-
-            y, sr = librosa.load(song_file, sr=None)  # Load audio file and specify sample rate
-        except:
-            return Response({"error": "Format not recognised"}, status=status.HTTP_400_BAD_REQUEST)
-
         print("checkpoint")
 
         # Extract duration
@@ -143,6 +137,20 @@ class LowLevelPredictionView(APIView):
         if "song_art_cover" in request.FILES:
             song_art_cover = request.FILES["song_art_cover"]
             song_art_cover_url = upload_song_cover_art_pic_cloudinary(song_art_cover)
+
+        try:
+
+            y, sr = librosa.load(song_file, sr=None)  # Load audio file and specify sample rate
+            print("checkpoint")
+        except:
+            print("checkpoint1")
+            task_instance = PopularityPredictionTask.objects.create(
+                user_profile=user_profile,
+                song_name=song_name,
+                song_cover_art_url=song_art_cover_url,
+                status="failed",
+            )
+            return Response({"error": "Format not recognised"}, status=status.HTTP_400_BAD_REQUEST)
 
         # print(song_art_cover_url)
 
