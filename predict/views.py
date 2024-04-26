@@ -7,7 +7,11 @@ from rest_framework.permissions import AllowAny
 
 from predict.models import PopularityPredictionTask
 from predict.serializers import PopularityPredictionTaskSerializer
-from common_components.utils import upload_profile_pic_cloudinary, upload_song_file_cloudinary
+from common_components.utils import (
+    upload_profile_pic_cloudinary,
+    upload_song_file_cloudinary,
+    upload_song_cover_art_pic_cloudinary,
+)
 from django.core.files.base import ContentFile
 
 from io import BytesIO
@@ -27,6 +31,7 @@ CLOUDINARY_API_KEY = os.getenv("CLOUDINARY_API_KEY")
 CLOUDINARY_API_SECRET = os.getenv("CLOUDINARY_API_SECRET")
 
 PROFILE_PIC_DEFAULT = os.getenv("PROFILE_PIC_DEFAULT")
+SONG_COVER_ART_DEFAULT = os.getenv("SONG_COVER_ART_DEFAULT")
 
 
 class CustomPagination(PageNumberPagination):
@@ -134,12 +139,12 @@ class LowLevelPredictionView(APIView):
         # duration = librosa.get_duration(y=y, sr=sr)
         # print(duration)
 
-        song_art_cover_url = PROFILE_PIC_DEFAULT
+        song_art_cover_url = SONG_COVER_ART_DEFAULT
         if "song_art_cover" in request.FILES:
             song_art_cover = request.FILES["song_art_cover"]
-            song_art_cover_url = upload_profile_pic_cloudinary(song_art_cover)
+            song_art_cover_url = upload_song_cover_art_pic_cloudinary(song_art_cover)
 
-        print(song_art_cover_url)
+        # print(song_art_cover_url)
 
         # song_file = request.FILES["song_file1"]
         # if not song_file.name.lower().endswith(".mp3"):
